@@ -23,8 +23,6 @@ export class MessageGateway {
     @MessageBody() message: CreateMessageDto,
     @ConnectedSocket() socket: Socket,
   ) {
-    socket.join('chat_one');
-    this.server.to('chat_one').emit('message', message.message);
-    //this.server.emit('message', messages);
+    this.messageService.handlerMessages(this.server, socket, message);
   }
 }
