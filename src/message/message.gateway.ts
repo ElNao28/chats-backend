@@ -20,22 +20,31 @@ export class MessageGateway {
   private server: Server;
 
   handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+    // console.log(`Client connected: ${client.id}`);
   }
   handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+    // console.log(`Client disconnected: ${client.id}`);
   }
 
   @SubscribeMessage('createMessage')
-  create(
+  public create(
     @MessageBody() message: CreateMessageDto,
     @ConnectedSocket() socket: Socket,
   ) {
     this.messageService.handlerMessages(this.server, socket, message);
   }
 
+  @SubscribeMessage('connectRoom')
+  public async connectRoom(
+    @MessageBody() data: { chatId: string },
+    @ConnectedSocket() socket: Socket,
+  ) {
+    const { chatId } = data;
+    await this.messageService.getMessagesByChat(this.server, chatId, socket);
+  }
+
   @SubscribeMessage('createRoom')
-  async createRoom(
+  public async createRoom(
     @MessageBody() data: { idUser: string },
     @ConnectedSocket() socket: Socket,
   ) {

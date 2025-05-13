@@ -39,7 +39,7 @@ export class MessageService {
       });
     }
     await this.createMessage(from, chat!, message);
-    await this.sendMessageToUser(server, clientSocket, chat!, message);
+    await this.sendMessageToUser(server, clientSocket, chat!);
     await this.getChatsById(server, from);
     await this.getChatsById(server, to);
   }
@@ -76,11 +76,13 @@ export class MessageService {
 
       const newUserChat = this.userChatRepository.create({
         id: uuidv4(),
+        title: toUser!.username,
         user: fromUser!,
         chat,
       });
       const newUserChat2 = this.userChatRepository.create({
         id: uuidv4(),
+        title: fromUser!.username,
         user: toUser!,
         chat,
       });
@@ -104,6 +106,7 @@ export class MessageService {
       const newMessage = this.messageRepository.create({
         id: uuidv4(),
         message,
+        createdAt: new Date(),
         user: fromUser!,
         chat,
       });
@@ -116,11 +119,9 @@ export class MessageService {
     server: Server,
     clienSocket: Socket,
     chat: Chat,
-    message: string,
   ): Promise<void> {
     try {
-      clienSocket.join(chat.id);
-      server.to(chat.id).emit('message', { message });
+      await this.getMessagesByChat(server, chat.id, clienSocket);
     } catch (error) {
       console.log('Error sending message to user', error);
     }
@@ -142,14 +143,42 @@ export class MessageService {
         where: {
           user: foundUser!,
         },
-        relations: ['chat'],
+        relations: ['chat', 'chat.messages'],
       });
+
       if (clientSocket) {
         clientSocket.join(idUser);
       }
       server.to(idUser).emit('chatsRoom', foundChats);
     } catch (error) {
       console.log('Error getting messages by contacts', error);
+    }
+  }
+
+  public async getMessagesByChat(
+    server: Server,
+    chatId: string,
+    clientSocket: Socket,
+  ) {
+    try {
+      const foundChat = await this.chatRepository.findOne({
+        where: {
+          id: chatId,
+        },
+      });
+      const messages = await this.messageRepository.find({
+        where: {
+          chat: foundChat!,
+        },
+        relations: ['user'],
+        order: {
+          createdAt: 'ASC',
+        },
+      });
+      clientSocket.join(chatId);
+      server.to(chatId).emit('messagesRoom', messages);
+    } catch (error) {
+      console.log('Error getting messages by chat', error);
     }
   }
 }

@@ -8,6 +8,10 @@ export class Message {
   id: string;
   @Column()
   message: string;
+  @Column({
+    type:'timestamp'
+  })
+  createdAt: Date;
 
   @ManyToOne(() => User, (user) => user.messages)
   user: User;
