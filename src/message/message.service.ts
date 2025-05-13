@@ -170,7 +170,7 @@ export class MessageService {
         where: {
           chat: foundChat!,
         },
-        relations: ['user'],
+        relations: ['user', 'user.chats', 'user.chats.chat'],
         order: {
           createdAt: 'ASC',
         },
