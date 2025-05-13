@@ -38,4 +38,21 @@ export class UserService {
       );
     }
   }
+  public async findAllUsers() {
+    try {
+      const foundAllUsers = await this.userRepository.find();
+      return new HandlerResponse<User[]>(
+        HttpStatus.OK,
+        foundAllUsers,
+        'Users retrieved successfully',
+      );
+    } catch (error) {
+      console.error(error);
+      return new HandlerResponse<null>(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        null,
+        'An error occurred while retrieving the users',
+      );
+    }
+  }
 }
