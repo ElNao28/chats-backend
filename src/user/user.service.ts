@@ -6,6 +6,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcrypt';
+import { HandlerResponse } from 'src/utils/Handler-response.util';
 
 @Injectable()
 export class UserService {
@@ -22,17 +23,19 @@ export class UserService {
         ...newUserData,
       });
       await this.userRepository.save(newUser);
-      return {
-        message: 'User created successfully',
-        status: HttpStatus.CREATED,
-        user: newUser,
-      };
+
+      return new HandlerResponse<User>(
+        HttpStatus.CREATED,
+        newUser,
+        'User created successfully',
+      );
     } catch (error) {
       console.error(error);
-      return {
-        message: 'Error creating user',
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
-      };
+      return new HandlerResponse<null>(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        null,
+        'An error occurred while creating the user',
+      );
     }
   }
 }
