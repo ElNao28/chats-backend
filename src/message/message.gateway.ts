@@ -18,11 +18,28 @@ export class MessageGateway {
 
   @WebSocketServer()
   private server: Server;
+
+  handleConnection(client: Socket) {
+    console.log(`Client connected: ${client.id}`);
+  }
+  handleDisconnect(client: Socket) {
+    console.log(`Client disconnected: ${client.id}`);
+  }
+
   @SubscribeMessage('createMessage')
   create(
     @MessageBody() message: CreateMessageDto,
     @ConnectedSocket() socket: Socket,
   ) {
     this.messageService.handlerMessages(this.server, socket, message);
+  }
+
+  @SubscribeMessage('createRoom')
+  async createRoom(
+    @MessageBody() data: { idUser: string },
+    @ConnectedSocket() socket: Socket,
+  ) {
+    const { idUser } = data;
+    await this.messageService.getChatsById(this.server, idUser, socket);
   }
 }

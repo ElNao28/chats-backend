@@ -40,6 +40,8 @@ export class MessageService {
     }
     await this.createMessage(from, chat!, message);
     await this.sendMessageToUser(server, clientSocket, chat!, message);
+    await this.getChatsById(server, from);
+    await this.getChatsById(server, to);
   }
   private async createNewChat(from: string, to: string): Promise<Chat | null> {
     try {
@@ -121,6 +123,33 @@ export class MessageService {
       server.to(chat.id).emit('message', { message });
     } catch (error) {
       console.log('Error sending message to user', error);
+    }
+  }
+
+  public async getChatsById(
+    server: Server,
+    idUser: string,
+    clientSocket?: Socket,
+  ) {
+    try {
+      const foundUser = await this.userRepository.findOne({
+        where: {
+          id: idUser,
+        },
+        relations: ['chats', 'messages'],
+      });
+      const foundChats = await this.userChatRepository.find({
+        where: {
+          user: foundUser!,
+        },
+        relations: ['chat'],
+      });
+      if (clientSocket) {
+        clientSocket.join(idUser);
+      }
+      server.to(idUser).emit('chatsRoom', foundChats);
+    } catch (error) {
+      console.log('Error getting messages by contacts', error);
     }
   }
 }
