@@ -1,15 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { Server, Socket } from 'socket.io';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { User } from 'src/user/entities/user.entity';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Message } from './entities/message.entity';
 import { Chat } from './entities/chats.entity';
 import { UserChat } from './entities/user-chat.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { UserConected } from 'src/utils/UserConected.interface';
 import { WebSocketServer } from '@nestjs/websockets';
+import { HandlerResponse } from 'src/utils/Handler-response.util';
 
 let listUsersApp: UserConected[] = [];
 
@@ -24,9 +25,15 @@ export class MessageService {
     private chatRepository: Repository<Chat>,
     @InjectRepository(UserChat)
     private userChatRepository: Repository<UserChat>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
-  public async enterUserToApp(userId: string, socketClient: Socket,server:Server) {
+  public async enterUserToApp(
+    userId: string,
+    socketClient: Socket,
+    server: Server,
+  ) {
     try {
       await this.userRepository.update(
         { id: userId },
@@ -61,7 +68,11 @@ export class MessageService {
     }
   }
 
-  public async sendListChatsByUser(clientService: Socket, userId: string, server:Server) {
+  public async sendListChatsByUser(
+    clientService: Socket,
+    userId: string,
+    server: Server,
+  ) {
     try {
       const chats = await this.chatRepository.find({
         relations: ['chats', 'chats.user', 'messages'],
@@ -87,6 +98,40 @@ export class MessageService {
       server.to(userId).emit('listChats', listChats);
     } catch (error) {
       console.log('Error sending list of chats', error);
+    }
+  }
+  public async checkIdChat(usersData: { to: string; from: string }) {
+    try {
+      const { to, from } = usersData;
+      const foundChat = await this.dataSource
+        .getRepository(Chat)
+        .createQueryBuilder('chat')
+        .leftJoinAndSelect('chat.messages', 'message')
+        .innerJoin('chat.chats', 'userChatOne')
+        .innerJoin('chat.chats', 'userChatTwo')
+        .where('userChatOne.user.id = :to', {
+          to,
+        })
+        .andWhere('userChatTwo.user.id = :from', {
+          from,
+        })
+        .getOne();
+      if (!foundChat)
+        return new HandlerResponse(HttpStatus.NOT_FOUND, {}, 'Chat not found');
+      return this.getMessagesByChat(foundChat.id);
+    } catch (error) {
+      console.log('Error getting messages between users', error);
+    }
+  }
+  public async getMessagesByChat(chatId: string) {
+    try {
+      const messages = await this.chatRepository.findOne({
+        where: { id: chatId },
+        relations: ['messages', 'messages.user'],
+      });
+      return new HandlerResponse(HttpStatus.OK, messages, 'Messages found');
+    } catch (error) {
+      console.log('Error getting messages by chat', error);
     }
   }
 }
