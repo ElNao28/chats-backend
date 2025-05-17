@@ -13,6 +13,16 @@ export class User {
   @Column()
   password: string;
 
+  @Column({
+    nullable:true
+  })
+  lastConection: Date;
+
+  @Column({
+    default: 'offline',
+  })
+  status: 'online' | 'offline';
+
   @OneToMany(() => UserChat, (userchat) => userchat.user)
   chats: UserChat[];
   @OneToMany(() => Message, (message) => message.user)

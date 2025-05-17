@@ -8,6 +8,9 @@ import { Message } from './entities/message.entity';
 import { Chat } from './entities/chats.entity';
 import { UserChat } from './entities/user-chat.entity';
 import { v4 as uuidv4 } from 'uuid';
+import { UserConected } from 'src/utils/UserConected.interface';
+
+let listUsersApp: UserConected[] = [];
 
 @Injectable()
 export class MessageService {
@@ -21,164 +24,67 @@ export class MessageService {
     @InjectRepository(UserChat)
     private userChatRepository: Repository<UserChat>,
   ) {}
-  public async handlerMessages(
-    server: Server,
-    clientSocket: Socket,
-    createMessageDto: CreateMessageDto,
-  ) {
-    const { from, to, message, chatId } = createMessageDto;
-    let chat: Chat | null = null;
 
-    if (!chatId) {
-      chat = await this.createNewChat(from, to);
-    } else {
-      chat = await this.chatRepository.findOne({
-        where: {
-          id: chatId,
-        },
-      });
-    }
-    await this.createMessage(from, chat!, message);
-    await this.sendMessageToUser(server, clientSocket, chat!);
-    await this.getChatsById(server, from);
-    await this.getChatsById(server, to);
-  }
-  private async createNewChat(from: string, to: string): Promise<Chat | null> {
+  public async enterUserToApp(userId: string, socketClient: Socket) {
     try {
-      const newChat = this.chatRepository.create({
-        id: uuidv4(),
-        createOn: new Date(),
-      });
-      const saveChat = await this.chatRepository.save(newChat);
-      await this.createNewUserChat(from, to, saveChat);
-      return saveChat;
+      await this.userRepository.update(
+        { id: userId },
+        {
+          status: 'online',
+        },
+      );
+      await this.sendListChatsByUser(socketClient, userId);
+      listUsersApp.push({ userId, socketId: socketClient.id });
     } catch (error) {
-      console.log('Error creating new chat', error);
-      return null;
+      console.log('Error entering user to app', error);
     }
   }
-  private async createNewUserChat(
-    from: string,
-    to: string,
-    chat: Chat,
-  ): Promise<void> {
+  public async exitUser(socketClient: Socket) {
     try {
-      const fromUser = await this.userRepository.findOne({
-        where: {
-          id: from,
+      const foundUser = await listUsersApp.find(
+        (socket) => socket.socketId === socketClient.id,
+      );
+      await this.userRepository.update(
+        { id: foundUser?.userId },
+        {
+          status: 'offline',
+          lastConection: new Date(),
         },
-      });
-      const toUser = await this.userRepository.findOne({
-        where: {
-          id: to,
-        },
-      });
-
-      const newUserChat = this.userChatRepository.create({
-        id: uuidv4(),
-        title: toUser!.username,
-        user: fromUser!,
-        chat,
-      });
-      const newUserChat2 = this.userChatRepository.create({
-        id: uuidv4(),
-        title: fromUser!.username,
-        user: toUser!,
-        chat,
-      });
-      await this.userChatRepository.save(newUserChat);
-      await this.userChatRepository.save(newUserChat2);
+      );
+      listUsersApp = listUsersApp.filter(
+        (socket) => socket.socketId !== socketClient.id,
+      );
     } catch (error) {
-      console.log('Error creating new user chat', error);
-    }
-  }
-  private async createMessage(
-    from: string,
-    chat: Chat,
-    message: string,
-  ): Promise<void> {
-    try {
-      const fromUser = await this.userRepository.findOne({
-        where: {
-          id: from,
-        },
-      });
-      const newMessage = this.messageRepository.create({
-        id: uuidv4(),
-        message,
-        createdAt: new Date(),
-        user: fromUser!,
-        chat,
-      });
-      await this.messageRepository.save(newMessage);
-    } catch (error) {
-      console.log('Error creating new message', error);
-    }
-  }
-  private async sendMessageToUser(
-    server: Server,
-    clienSocket: Socket,
-    chat: Chat,
-  ): Promise<void> {
-    try {
-      await this.getMessagesByChat(server, chat.id, clienSocket);
-    } catch (error) {
-      console.log('Error sending message to user', error);
+      console.log('Error checking user existence', error);
     }
   }
 
-  public async getChatsById(
-    server: Server,
-    idUser: string,
-    clientSocket?: Socket,
-  ) {
+  public async sendListChatsByUser(clientService: Socket, userId: string) {
     try {
-      const foundUser = await this.userRepository.findOne({
-        where: {
-          id: idUser,
-        },
-        relations: ['chats', 'messages'],
+      const chats = await this.chatRepository.find({
+        relations: ['chats', 'chats.user', 'messages'],
       });
-      const foundChats = await this.userChatRepository.find({
-        where: {
-          user: foundUser!,
-        },
-        relations: ['chat', 'chat.messages'],
+      const chatByUser = chats.filter((chat) => {
+        return chat.chats.some((userChat) => userChat.user.id === userId);
       });
-
-      if (clientSocket) {
-        clientSocket.join(idUser);
-      }
-      server.to(idUser).emit('chatsRoom', foundChats);
+      const chatFilter = chatByUser.map((chat) => {
+        const { chats, ...chatRest } = chat;
+        return {
+          chat: chats.filter((userChat) => userChat.user.id !== userId)[0],
+          ...chatRest,
+        };
+      });
+      const listChats = chatFilter.map((chat) => {
+        const { messages, ...restChat } = chat;
+        const lastMessage = messages[messages.length - 1];
+        return {
+          lastMessage,
+          ...restChat,
+        };
+      });
+      clientService.emit('listChats', listChats);
     } catch (error) {
-      console.log('Error getting messages by contacts', error);
-    }
-  }
-
-  public async getMessagesByChat(
-    server: Server,
-    chatId: string,
-    clientSocket: Socket,
-  ) {
-    try {
-      const foundChat = await this.chatRepository.findOne({
-        where: {
-          id: chatId,
-        },
-      });
-      const messages = await this.messageRepository.find({
-        where: {
-          chat: foundChat!,
-        },
-        relations: ['user', 'user.chats', 'user.chats.chat'],
-        order: {
-          createdAt: 'ASC',
-        },
-      });
-      clientSocket.join(chatId);
-      server.to(chatId).emit('messagesRoom', messages);
-    } catch (error) {
-      console.log('Error getting messages by chat', error);
+      console.log('Error sending list of chats', error);
     }
   }
 }

@@ -23,32 +23,14 @@ export class MessageGateway {
     // console.log(`Client connected: ${client.id}`);
   }
   handleDisconnect(client: Socket) {
-    // console.log(`Client disconnected: ${client.id}`);
+    this.messageService.exitUser(client);
   }
 
-  @SubscribeMessage('createMessage')
-  public create(
-    @MessageBody() message: CreateMessageDto,
+  @SubscribeMessage('enterApp')
+  public async enterApp(
+    @MessageBody() data: { userId: string },
     @ConnectedSocket() socket: Socket,
   ) {
-    this.messageService.handlerMessages(this.server, socket, message);
-  }
-
-  @SubscribeMessage('connectRoom')
-  public async connectRoom(
-    @MessageBody() data: { chatId: string },
-    @ConnectedSocket() socket: Socket,
-  ) {
-    const { chatId } = data;
-    await this.messageService.getMessagesByChat(this.server, chatId, socket);
-  }
-
-  @SubscribeMessage('createRoom')
-  public async createRoom(
-    @MessageBody() data: { idUser: string },
-    @ConnectedSocket() socket: Socket,
-  ) {
-    const { idUser } = data;
-    await this.messageService.getChatsById(this.server, idUser, socket);
+    await this.messageService.enterUserToApp(data.userId, socket);
   }
 }
