@@ -9,6 +9,7 @@ import { Chat } from './entities/chats.entity';
 import { UserChat } from './entities/user-chat.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { UserConected } from 'src/utils/UserConected.interface';
+import { WebSocketServer } from '@nestjs/websockets';
 
 let listUsersApp: UserConected[] = [];
 
@@ -25,7 +26,7 @@ export class MessageService {
     private userChatRepository: Repository<UserChat>,
   ) {}
 
-  public async enterUserToApp(userId: string, socketClient: Socket) {
+  public async enterUserToApp(userId: string, socketClient: Socket,server:Server) {
     try {
       await this.userRepository.update(
         { id: userId },
@@ -33,7 +34,8 @@ export class MessageService {
           status: 'online',
         },
       );
-      await this.sendListChatsByUser(socketClient, userId);
+      socketClient.join(userId);
+      await this.sendListChatsByUser(socketClient, userId, server);
       listUsersApp.push({ userId, socketId: socketClient.id });
     } catch (error) {
       console.log('Error entering user to app', error);
@@ -59,7 +61,7 @@ export class MessageService {
     }
   }
 
-  public async sendListChatsByUser(clientService: Socket, userId: string) {
+  public async sendListChatsByUser(clientService: Socket, userId: string, server:Server) {
     try {
       const chats = await this.chatRepository.find({
         relations: ['chats', 'chats.user', 'messages'],
@@ -82,7 +84,7 @@ export class MessageService {
           ...restChat,
         };
       });
-      clientService.emit('listChats', listChats);
+      server.to(userId).emit('listChats', listChats);
     } catch (error) {
       console.log('Error sending list of chats', error);
     }

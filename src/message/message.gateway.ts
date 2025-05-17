@@ -14,6 +14,7 @@ import { Server, Socket } from 'socket.io';
   namespace: 'message',
 })
 export class MessageGateway {
+
   constructor(private readonly messageService: MessageService) {}
 
   @WebSocketServer()
@@ -31,6 +32,6 @@ export class MessageGateway {
     @MessageBody() data: { userId: string },
     @ConnectedSocket() socket: Socket,
   ) {
-    await this.messageService.enterUserToApp(data.userId, socket);
+    await this.messageService.enterUserToApp(data.userId, socket, this.server);
   }
 }
