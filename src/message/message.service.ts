@@ -42,7 +42,7 @@ export class MessageService {
         },
       );
       socketClient.join(userId);
-      await this.sendListChatsByUser(socketClient, userId, server);
+      await this.sendListChatsByUser(userId, server);
       listUsersApp.push({ userId, socketId: socketClient.id });
     } catch (error) {
       console.log('Error entering user to app', error);
@@ -67,11 +67,7 @@ export class MessageService {
       console.log('Error checking user existence', error);
     }
   }
-  public async sendListChatsByUser(
-    clientService: Socket,
-    userId: string,
-    server: Server,
-  ) {
+  public async sendListChatsByUser(userId: string, server: Server) {
     try {
       const chats = await this.chatRepository.find({
         relations: ['chats', 'chats.user', 'messages'],
@@ -144,11 +140,11 @@ export class MessageService {
 
       if (!chatId) {
         chat = await this.createNewChat();
+        await this.createUserChat(from, to, chat);
       } else {
         chat = (await this.chatRepository.findOneBy({ id: chatId }))!;
       }
-      await this.createUserChat(from, to, chat);
-      await this.sendMessage(message, chat, from, server);
+      await this.sendMessage(message, chat, from, to, server);
     } catch (error) {
       console.log('Error sending message', error);
       throw error;
@@ -199,6 +195,7 @@ export class MessageService {
     message: string,
     chat: Chat,
     idUser: string,
+    to: string,
     server: Server,
   ) {
     try {
@@ -217,6 +214,7 @@ export class MessageService {
           relations: ['user'],
         });
         server.to(chat.id).emit('newMessage', message);
+        this.sendListChatsByUser(to, server);
       }
     } catch (error) {
       console.log('Error sending message', error);
