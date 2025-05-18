@@ -67,7 +67,6 @@ export class MessageService {
       console.log('Error checking user existence', error);
     }
   }
-
   public async sendListChatsByUser(
     clientService: Socket,
     userId: string,
@@ -132,6 +131,96 @@ export class MessageService {
       return new HandlerResponse(HttpStatus.OK, messages, 'Messages found');
     } catch (error) {
       console.log('Error getting messages by chat', error);
+    }
+  }
+  public async handlerSendMessage(
+    data: CreateMessageDto,
+    clientSocket: Socket,
+    server: Server,
+  ) {
+    try {
+      const { from, to, message, chatId } = data;
+      let chat: Chat;
+
+      if (!chatId) {
+        chat = await this.createNewChat();
+      } else {
+        chat = (await this.chatRepository.findOneBy({ id: chatId }))!;
+      }
+      await this.createUserChat(from, to, chat);
+      await this.sendMessage(message, chat, from, server);
+    } catch (error) {
+      console.log('Error sending message', error);
+      throw error;
+    }
+  }
+  private async createNewChat(): Promise<Chat> {
+    try {
+      const newChat = this.chatRepository.create({
+        id: uuidv4(),
+        createOn: new Date(),
+      });
+      const saveChat = await this.chatRepository.save(newChat);
+      return saveChat;
+    } catch (error) {
+      console.log('Error creating new chat', error);
+      throw error;
+    }
+  }
+  private async createUserChat(
+    userOneId: string,
+    userTwoId: string,
+    chat: Chat,
+  ) {
+    try {
+      const userOne = await this.userRepository.findOneBy({ id: userOneId });
+      const userTwo = await this.userRepository.findOneBy({ id: userTwoId });
+
+      const newUserChat = this.userChatRepository.create({
+        id: uuidv4(),
+        title: `${userOne!.username} and ${userTwo!.username}`,
+        user: userOne!,
+        chat,
+      });
+      const newUserChatTwo = this.userChatRepository.create({
+        id: uuidv4(),
+        title: `${userOne!.username} and ${userTwo!.username}`,
+        user: userTwo!,
+        chat,
+      });
+      await this.userChatRepository.save(newUserChat);
+      await this.userChatRepository.save(newUserChatTwo);
+    } catch (error) {
+      console.log('Error creating user chat', error);
+      throw error;
+    }
+  }
+  private async sendMessage(
+    message: string,
+    chat: Chat,
+    idUser: string,
+    server: Server,
+  ) {
+    try {
+      const user = (await this.userRepository.findOneBy({ id: idUser }))!;
+      const newMessage = this.messageRepository.create({
+        id: uuidv4(),
+        message,
+        createdAt: new Date(),
+        chat,
+        user,
+      });
+      const savedMessage = await this.messageRepository.save(newMessage);
+      if (savedMessage) {
+        const message = await this.messageRepository.findOne({
+          where: { id: savedMessage.id },
+          relations: ['user'],
+        });
+        server.to(chat.id).emit('newMessage', message);
+      }
+    } catch (error) {
+      console.log('Error sending message', error);
+      throw error;
     }
   }
 }

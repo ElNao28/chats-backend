@@ -34,9 +34,20 @@ export class MessageGateway {
     await this.messageService.enterUserToApp(data.userId, socket, this.server);
   }
 
+  @SubscribeMessage('joinRoom')
+  public async joinRoom(
+    @MessageBody() data: { chatId: string },
+    @ConnectedSocket() socket: Socket,
+  ) {
+    socket.join(data.chatId);
+  }
+
   @SubscribeMessage('sendMessage')
   public async getMessagesByChat(
-    @MessageBody() data: { to: string; from: string },
+    @MessageBody()
+    data: CreateMessageDto,
     @ConnectedSocket() socket: Socket,
-  ) {}
+  ) {
+    await this.messageService.handlerSendMessage(data, socket, this.server);
+  }
 }
