@@ -118,6 +118,17 @@ export class MessageService {
       console.log('Error getting messages between users', error);
     }
   }
+  public async checkStatusUser(userId: string, clientSocket: Socket) {
+    try {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+      });
+      clientSocket.emit('statusUser', user);
+    } catch (error) {
+      console.log('Error checking user status', error);
+      throw error;
+    }
+  }
   public async getMessagesByChat(chatId: string) {
     try {
       const messages = await this.chatRepository.findOne({

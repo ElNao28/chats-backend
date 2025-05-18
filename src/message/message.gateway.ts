@@ -50,4 +50,12 @@ export class MessageGateway {
   ) {
     await this.messageService.handlerSendMessage(data, socket, this.server);
   }
+
+  @SubscribeMessage('checkStatusUser')
+  public async checkStatus(
+    @MessageBody() data: { userId: string },
+    @ConnectedSocket() socket: Socket,
+  ) {
+    await this.messageService.checkStatusUser(data.userId, socket);
+  }
 }
