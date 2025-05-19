@@ -71,6 +71,7 @@ export class MessageService {
     try {
       const chats = await this.chatRepository.find({
         relations: ['chats', 'chats.user', 'messages'],
+        order: { messages: {createdAt: 'ASC'} },
       });
       const chatByUser = chats.filter((chat) => {
         return chat.chats.some((userChat) => userChat.user.id === userId);
