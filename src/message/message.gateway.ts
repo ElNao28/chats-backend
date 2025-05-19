@@ -58,4 +58,16 @@ export class MessageGateway {
   ) {
     await this.messageService.checkStatusUser(data.userId, socket);
   }
+
+  @SubscribeMessage('isWriting')
+  public async writingEvent(
+    @MessageBody() data: { userId: string; chatId: string; isWriting: boolean },
+    @ConnectedSocket() socket: Socket,
+  ) {
+    const { userId, chatId, isWriting } = data;
+    socket.to(chatId).emit('writingStatus', {
+      userId: userId,
+      isWriting: isWriting,
+    });
+  }
 }

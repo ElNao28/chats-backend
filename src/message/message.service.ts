@@ -123,6 +123,7 @@ export class MessageService {
       const messages = await this.chatRepository.findOne({
         where: { id: chatId },
         relations: ['messages', 'messages.user'],
+        order: { messages: { createdAt: 'ASC' } },
       });
       return new HandlerResponse(HttpStatus.OK, messages, 'Messages found');
     } catch (error) {
@@ -223,6 +224,7 @@ export class MessageService {
         const message = await this.messageRepository.findOne({
           where: { id: savedMessage.id },
           relations: ['user'],
+          order: { createdAt: 'DESC' },
         });
         server.to(chat.id).emit('newMessage', message);
         this.sendListChatsByUser(to, server);
